@@ -112,6 +112,20 @@ def calcular_features(candles):
     topos, fundos = detectar_topos_fundos(closes)
     tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia = detectar_padrao(topos, fundos)
 
+    # Calcular rr com base no padrão detectado
+    if direcao == "VENDA" and preco_entrada > 0 and preco_referencia > 0:
+        stop_temp = preco_entrada * 1.02
+        risco = stop_temp - preco_entrada
+        retorno = preco_entrada - preco_referencia
+        rr = round(retorno / risco, 2) if risco > 0 else 0
+    elif direcao == "COMPRA" and preco_entrada > 0 and preco_referencia > 0:
+        stop_temp = preco_entrada * 0.98
+        risco = preco_entrada - stop_temp
+        retorno = preco_referencia - preco_entrada
+        rr = round(retorno / risco, 2) if risco > 0 else 0
+    else:
+        rr = 0
+
     return {
         "preco_vs_mm20": round(preco_vs_mm20, 2),
         "preco_vs_mm50": round(preco_vs_mm50, 2),
