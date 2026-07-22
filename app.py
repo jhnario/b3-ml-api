@@ -184,7 +184,6 @@ def calcular_features(candles, tolerancia=0.08):
         "preco_entrada":  round(preco_entrada, 2),
         "preco_referencia": round(preco_referencia, 2),
         "preco_extremo": round(preco_extremo, 2) if preco_extremo else round(preco_entrada, 2),
-        "motivo_debug": motivo_debug,
     }
 
 def calcular_operacao(direcao, entrada, referencia, extremo=None):
@@ -228,8 +227,7 @@ def predict():
             "confianca": 0,
             "entrada": None, "stop": None,
             "alvo1": None, "alvo2": None, "rr": None,
-            "motivo_debug": feat.get("motivo_debug", "?")
-        })
+            })
 
     X = np.array([feat[c] for c in colunas]).reshape(1, -1)
     prob      = modelo.predict_proba(X)[0][1]
@@ -272,7 +270,6 @@ def predict():
         "alvo2":       alvo2,
         "rr":          rr,
         "confianca":   confianca,
-        "motivo_debug": feat.get("motivo_debug", "?")
     })
 
 @app.route("/", methods=["GET"])
