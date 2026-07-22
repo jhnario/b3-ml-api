@@ -22,7 +22,7 @@ def detectar_topos_fundos(closes, janela=10):
             fundos.append({"idx": i, "preco": closes[i]})
     return topos, fundos
 
-def detectar_padrao(topos, fundos, closes, tolerancia=0.08):
+def detectar_padrao(topos, fundos, closes, tolerancia=0.08):  # tolerancia agora vem de fora
     candidatos = []
 
     for i in range(len(topos)-1):
@@ -95,7 +95,7 @@ def calcular_tendencia_longa(closes, janela=100):
     else:
         return "LATERAL"
 
-def calcular_features(candles):
+def calcular_features(candles, tolerancia=0.08):
     closes = [c["close"] for c in candles]
     highs  = [c["high"]  for c in candles]
     lows   = [c["low"]   for c in candles]
@@ -130,7 +130,7 @@ def calcular_features(candles):
     dist_fib618 = abs(close - (topo_fib - diff * 0.618)) / close * 100
 
     topos, fundos = detectar_topos_fundos(closes)
-    tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia, preco_extremo = detectar_padrao(topos, fundos, closes)
+    tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia, preco_extremo = detectar_padrao(topos, fundos, closes, tolerancia)
 
     # Entrada eh sempre o preco atual (ultimo fechamento) quando o padrao ja usa isso;
     # para padroes historicos confirmados, se a entrada retornada bate no fechamento atual
@@ -208,11 +208,12 @@ def calcular_operacao(direcao, entrada, referencia, extremo=None):
 def predict():
     dados = request.get_json()
     candles = dados.get("candles", [])
+    tolerancia_param = float(dados.get("tolerancia", 0.08))
 
     if len(candles) < 30:
         return jsonify({"erro": "Dados insuficientes — minimo 30 candles"}), 400
 
-    feat = calcular_features(candles)
+    feat = calcular_features(candles, tolerancia_param)
 
     if feat["tipo_num"] == -1:
         return jsonify({
