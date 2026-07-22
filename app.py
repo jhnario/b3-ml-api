@@ -132,14 +132,17 @@ def calcular_features(candles, tolerancia=0.08):
     topos, fundos = detectar_topos_fundos(closes)
     tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia, preco_extremo = detectar_padrao(topos, fundos, closes, tolerancia)
 
-    # Entrada eh sempre o preco atual (ultimo fechamento) quando o padrao ja usa isso;
-    # para padroes historicos confirmados, se a entrada retornada bate no fechamento atual
-    # dentro de 15%, tambem usamos o fechamento atual. Caso contrario, o padrao esta
-    # "velho" (preco ja andou muito desde entao) e nao deve gerar sinal -- validado:
-    # essa trava eh essencial para manter 74% de acerto.
-    if preco_entrada > 0 and abs(close - preco_entrada) / preco_entrada < 0.15:
-        preco_entrada = close
-        preco_extremo = preco_extremo if preco_extremo else preco_entrada
+    # Entrada eh SEMPRE o preco atual (ultimo fechamento). Se o padrao detectado
+    # estiver "velho" (preco do padrao muito distante do fechamento atual, >15%),
+    # o sinal e REJEITADO -- nao pode gerar um sinal com entrada desatualizada.
+    if tipo_num != -1:
+        if preco_entrada > 0 and abs(close - preco_entrada) / preco_entrada < 0.15:
+            preco_extremo = preco_extremo if preco_extremo else preco_entrada
+            preco_entrada = close
+        else:
+            # padrao velho demais -- rejeita o sinal
+            tipo_num, tipo_nome, direcao = -1, "SEM PADRAO", "INDEFINIDO"
+            preco_entrada, preco_referencia, preco_extremo = 0, 0, 0
 
     # Filtro de tendencia: bloqueia SOMENTE as combinacoes comprovadamente ruins
     tendencia = calcular_tendencia_longa(closes)
