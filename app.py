@@ -23,19 +23,26 @@ def detectar_topos_fundos(closes, janela=10):
     return topos, fundos
 
 def detectar_padrao(topos, fundos, tolerancia=0.08):
+    candidatos = []
+
+    # Topo duplo
     for i in range(len(topos)-1):
         t1, t2 = topos[i], topos[i+1]
         if abs(t1["preco"] - t2["preco"]) / t1["preco"] <= tolerancia:
             f_entre = [f for f in fundos if t1["idx"] < f["idx"] < t2["idx"]]
             if f_entre:
-                return 0, "TOPO DUPLO", "VENDA", t2["preco"], f_entre[0]["preco"]
+                candidatos.append((t2["idx"], 0, "TOPO DUPLO", "VENDA", t2["preco"], f_entre[0]["preco"]))
+
+    # Topo triplo
     for i in range(len(topos)-2):
         t1, t2, t3 = topos[i], topos[i+1], topos[i+2]
         if abs(t1["preco"]-t2["preco"])/t1["preco"] <= tolerancia and abs(t2["preco"]-t3["preco"])/t2["preco"] <= tolerancia:
             f1 = [f for f in fundos if t1["idx"] < f["idx"] < t2["idx"]]
             f2 = [f for f in fundos if t2["idx"] < f["idx"] < t3["idx"]]
             if f1 and f2:
-                return 1, "TOPO TRIPLO", "VENDA", t3["preco"], min(f1[0]["preco"], f2[0]["preco"])
+                candidatos.append((t3["idx"], 1, "TOPO TRIPLO", "VENDA", t3["preco"], min(f1[0]["preco"], f2[0]["preco"])))
+
+    # OCO
     for i in range(len(topos)-2):
         oe, cab, od = topos[i], topos[i+1], topos[i+2]
         if cab["preco"] > oe["preco"] and cab["preco"] > od["preco"]:
@@ -44,20 +51,26 @@ def detectar_padrao(topos, fundos, tolerancia=0.08):
                 f2 = [f for f in fundos if cab["idx"] < f["idx"] < od["idx"]]
                 if f1 and f2:
                     pescoco = (f1[0]["preco"] + f2[0]["preco"]) / 2
-                    return 2, "OCO", "VENDA", od["preco"], pescoco
+                    candidatos.append((od["idx"], 2, "OCO", "VENDA", od["preco"], pescoco))
+
+    # Fundo duplo
     for i in range(len(fundos)-1):
         f1, f2 = fundos[i], fundos[i+1]
         if abs(f1["preco"] - f2["preco"]) / f1["preco"] <= tolerancia:
             t_entre = [t for t in topos if f1["idx"] < t["idx"] < f2["idx"]]
             if t_entre:
-                return 3, "FUNDO DUPLO", "COMPRA", f2["preco"], t_entre[0]["preco"]
+                candidatos.append((f2["idx"], 3, "FUNDO DUPLO", "COMPRA", f2["preco"], t_entre[0]["preco"]))
+
+    # Fundo triplo
     for i in range(len(fundos)-2):
         f1, f2, f3 = fundos[i], fundos[i+1], fundos[i+2]
         if abs(f1["preco"]-f2["preco"])/f1["preco"] <= tolerancia and abs(f2["preco"]-f3["preco"])/f2["preco"] <= tolerancia:
             t1 = [t for t in topos if f1["idx"] < t["idx"] < f2["idx"]]
             t2 = [t for t in topos if f2["idx"] < t["idx"] < f3["idx"]]
             if t1 and t2:
-                return 4, "FUNDO TRIPLO", "COMPRA", f3["preco"], max(t1[0]["preco"], t2[0]["preco"])
+                candidatos.append((f3["idx"], 4, "FUNDO TRIPLO", "COMPRA", f3["preco"], max(t1[0]["preco"], t2[0]["preco"])))
+
+    # OCO invertido
     for i in range(len(fundos)-2):
         oe, cab, od = fundos[i], fundos[i+1], fundos[i+2]
         if cab["preco"] < oe["preco"] and cab["preco"] < od["preco"]:
@@ -66,8 +79,15 @@ def detectar_padrao(topos, fundos, tolerancia=0.08):
                 t2 = [t for t in topos if cab["idx"] < t["idx"] < od["idx"]]
                 if t1 and t2:
                     pescoco = (t1[0]["preco"] + t2[0]["preco"]) / 2
-                    return 5, "OCO INVERTIDO", "COMPRA", od["preco"], pescoco
-    return -1, "SEM PADRAO", "INDEFINIDO", 0, 0
+                    candidatos.append((od["idx"], 5, "OCO INVERTIDO", "COMPRA", od["preco"], pescoco))
+
+    if not candidatos:
+        return -1, "SEM PADRAO", "INDEFINIDO", 0, 0
+
+    # Retorna o padrao mais recente (maior idx)
+    candidatos.sort(key=lambda x: x[0], reverse=True)
+    _, tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia = candidatos[0]
+    return tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia
 
 def calcular_features(candles):
     closes = [c["close"] for c in candles]
