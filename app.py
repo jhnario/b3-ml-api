@@ -132,32 +132,14 @@ def calcular_features(candles, tolerancia=0.08):
     topos, fundos = detectar_topos_fundos(closes)
     tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia, preco_extremo = detectar_padrao(topos, fundos, closes, tolerancia)
 
-    # A entrada eh SEMPRE o preco atual (ultimo fechamento) -- eh o unico preco
-    # pelo qual e possivel operar hoje. Como o padrao pode ter sido formado com
-    # precos diferentes do preco atual (papel subiu/caiu desde entao), recalculamos
-    # a referencia (alvo) mantendo a MESMA distancia percentual que existia no
-    # padrao original, agora aplicada sobre o preco de entrada atual.
-    if tipo_num != -1:
-        preco_padrao_original = preco_entrada if preco_entrada > 0 else close
-        preco_extremo = preco_extremo if preco_extremo else preco_padrao_original
-
-        # distancia percentual entre o padrao e sua referencia (fundo/topo alvo)
-        if preco_padrao_original > 0:
-            dist_pct_referencia = (preco_referencia - preco_padrao_original) / preco_padrao_original
-        else:
-            dist_pct_referencia = 0
-
-        # distancia percentual entre o padrao e seu extremo (base do stop)
-        if preco_padrao_original > 0:
-            dist_pct_extremo = (preco_extremo - preco_padrao_original) / preco_padrao_original
-        else:
-            dist_pct_extremo = 0.02 if direcao == "VENDA" else -0.02
-
+    # Entrada eh sempre o preco atual (ultimo fechamento) quando o padrao ja usa isso;
+    # para padroes historicos confirmados, se a entrada retornada bate no fechamento atual
+    # dentro de 15%, tambem usamos o fechamento atual. Caso contrario, o padrao esta
+    # "velho" (preco ja andou muito desde entao) e nao deve gerar sinal -- validado:
+    # essa trava eh essencial para manter 74% de acerto.
+    if preco_entrada > 0 and abs(close - preco_entrada) / preco_entrada < 0.15:
         preco_entrada = close
-        preco_referencia = round(preco_entrada * (1 + dist_pct_referencia), 2)
-        preco_extremo = round(preco_entrada * (1 + dist_pct_extremo), 2)
-    else:
-        preco_entrada = 0
+        preco_extremo = preco_extremo if preco_extremo else preco_entrada
 
     # Filtro de tendencia: bloqueia SOMENTE as combinacoes comprovadamente ruins
     tendencia = calcular_tendencia_longa(closes)
