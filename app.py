@@ -22,27 +22,27 @@ def detectar_topos_fundos(closes, janela=10):
             fundos.append({"idx": i, "preco": closes[i]})
     return topos, fundos
 
-def detectar_padrao(topos, fundos, tolerancia=0.08):
-    candidatos = []
+def detectar_padrao(topos, fundos, closes, janela_recente=15, tolerancia=0.08, tolerancia_retest=0.08):
+    candidatos = []  # cada item: (idx_referencia, tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia, preco_extremo_stop)
+    ultimo_preco = closes[-1]
+    ultimo_idx = len(closes) - 1
 
-    # Topo duplo
+    # --- Padroes ja totalmente confirmados no historico ---
     for i in range(len(topos)-1):
         t1, t2 = topos[i], topos[i+1]
         if abs(t1["preco"] - t2["preco"]) / t1["preco"] <= tolerancia:
             f_entre = [f for f in fundos if t1["idx"] < f["idx"] < t2["idx"]]
             if f_entre:
-                candidatos.append((t2["idx"], 0, "TOPO DUPLO", "VENDA", t2["preco"], f_entre[0]["preco"]))
+                candidatos.append((t2["idx"], 0, "TOPO DUPLO", "VENDA", t2["preco"], f_entre[0]["preco"], t2["preco"]))
 
-    # Topo triplo
     for i in range(len(topos)-2):
         t1, t2, t3 = topos[i], topos[i+1], topos[i+2]
         if abs(t1["preco"]-t2["preco"])/t1["preco"] <= tolerancia and abs(t2["preco"]-t3["preco"])/t2["preco"] <= tolerancia:
             f1 = [f for f in fundos if t1["idx"] < f["idx"] < t2["idx"]]
             f2 = [f for f in fundos if t2["idx"] < f["idx"] < t3["idx"]]
             if f1 and f2:
-                candidatos.append((t3["idx"], 1, "TOPO TRIPLO", "VENDA", t3["preco"], min(f1[0]["preco"], f2[0]["preco"])))
+                candidatos.append((t3["idx"], 1, "TOPO TRIPLO", "VENDA", t3["preco"], min(f1[0]["preco"], f2[0]["preco"]), t3["preco"]))
 
-    # OCO
     for i in range(len(topos)-2):
         oe, cab, od = topos[i], topos[i+1], topos[i+2]
         if cab["preco"] > oe["preco"] and cab["preco"] > od["preco"]:
@@ -51,26 +51,23 @@ def detectar_padrao(topos, fundos, tolerancia=0.08):
                 f2 = [f for f in fundos if cab["idx"] < f["idx"] < od["idx"]]
                 if f1 and f2:
                     pescoco = (f1[0]["preco"] + f2[0]["preco"]) / 2
-                    candidatos.append((od["idx"], 2, "OCO", "VENDA", od["preco"], pescoco))
+                    candidatos.append((od["idx"], 2, "OCO", "VENDA", od["preco"], pescoco, cab["preco"]))
 
-    # Fundo duplo
     for i in range(len(fundos)-1):
         f1, f2 = fundos[i], fundos[i+1]
         if abs(f1["preco"] - f2["preco"]) / f1["preco"] <= tolerancia:
             t_entre = [t for t in topos if f1["idx"] < t["idx"] < f2["idx"]]
             if t_entre:
-                candidatos.append((f2["idx"], 3, "FUNDO DUPLO", "COMPRA", f2["preco"], t_entre[0]["preco"]))
+                candidatos.append((f2["idx"], 3, "FUNDO DUPLO", "COMPRA", f2["preco"], t_entre[0]["preco"], f2["preco"]))
 
-    # Fundo triplo
     for i in range(len(fundos)-2):
         f1, f2, f3 = fundos[i], fundos[i+1], fundos[i+2]
         if abs(f1["preco"]-f2["preco"])/f1["preco"] <= tolerancia and abs(f2["preco"]-f3["preco"])/f2["preco"] <= tolerancia:
             t1 = [t for t in topos if f1["idx"] < t["idx"] < f2["idx"]]
             t2 = [t for t in topos if f2["idx"] < t["idx"] < f3["idx"]]
             if t1 and t2:
-                candidatos.append((f3["idx"], 4, "FUNDO TRIPLO", "COMPRA", f3["preco"], max(t1[0]["preco"], t2[0]["preco"])))
+                candidatos.append((f3["idx"], 4, "FUNDO TRIPLO", "COMPRA", f3["preco"], max(t1[0]["preco"], t2[0]["preco"]), f3["preco"]))
 
-    # OCO invertido
     for i in range(len(fundos)-2):
         oe, cab, od = fundos[i], fundos[i+1], fundos[i+2]
         if cab["preco"] < oe["preco"] and cab["preco"] < od["preco"]:
@@ -79,15 +76,41 @@ def detectar_padrao(topos, fundos, tolerancia=0.08):
                 t2 = [t for t in topos if cab["idx"] < t["idx"] < od["idx"]]
                 if t1 and t2:
                     pescoco = (t1[0]["preco"] + t2[0]["preco"]) / 2
-                    candidatos.append((od["idx"], 5, "OCO INVERTIDO", "COMPRA", od["preco"], pescoco))
+                    candidatos.append((od["idx"], 5, "OCO INVERTIDO", "COMPRA", od["preco"], pescoco, cab["preco"]))
+
+    # --- Padrao se formando: um topo/fundo recente (nao confirmado por candles futuros)
+    #     bate na mesma zona do ultimo topo/fundo ja confirmado. Isso cobre o caso de
+    #     "bateu no topo anteontem, caiu forte ontem e hoje" -- o 3o extremo eh o pico
+    #     recente, a entrada eh o preco de HOJE (ja em queda), e o stop se baseia
+    #     no preco do extremo recente, nao no preco de entrada.
+    inicio_janela = max(0, len(closes) - janela_recente)
+
+    if topos:
+        sub = closes[inicio_janela:]
+        idx_max_local = inicio_janela + sub.index(max(sub))
+        preco_max_recente = closes[idx_max_local]
+        t_ultimo = topos[-1]
+        if idx_max_local > t_ultimo["idx"] and abs(preco_max_recente - t_ultimo["preco"]) / t_ultimo["preco"] <= tolerancia_retest:
+            f_entre = [f for f in fundos if t_ultimo["idx"] < f["idx"] < idx_max_local]
+            fundo_ref = f_entre[0]["preco"] if f_entre else min(closes[t_ultimo["idx"]:idx_max_local+1])
+            candidatos.append((idx_max_local, 0, "TOPO DUPLO (formando)", "VENDA", ultimo_preco, fundo_ref, preco_max_recente))
+
+    if fundos:
+        sub = closes[inicio_janela:]
+        idx_min_local = inicio_janela + sub.index(min(sub))
+        preco_min_recente = closes[idx_min_local]
+        f_ultimo = fundos[-1]
+        if idx_min_local > f_ultimo["idx"] and abs(preco_min_recente - f_ultimo["preco"]) / f_ultimo["preco"] <= tolerancia_retest:
+            t_entre = [t for t in topos if f_ultimo["idx"] < t["idx"] < idx_min_local]
+            topo_ref = t_entre[0]["preco"] if t_entre else max(closes[f_ultimo["idx"]:idx_min_local+1])
+            candidatos.append((idx_min_local, 3, "FUNDO DUPLO (formando)", "COMPRA", ultimo_preco, topo_ref, preco_min_recente))
 
     if not candidatos:
-        return -1, "SEM PADRAO", "INDEFINIDO", 0, 0
+        return -1, "SEM PADRAO", "INDEFINIDO", 0, 0, 0
 
-    # Retorna o padrao mais recente (maior idx)
     candidatos.sort(key=lambda x: x[0], reverse=True)
-    _, tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia = candidatos[0]
-    return tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia
+    _, tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia, preco_extremo = candidatos[0]
+    return tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia, preco_extremo
 
 def calcular_features(candles):
     closes = [c["close"] for c in candles]
@@ -124,12 +147,14 @@ def calcular_features(candles):
     dist_fib618 = abs(close - (topo_fib - diff * 0.618)) / close * 100
 
     topos, fundos = detectar_topos_fundos(closes)
-    tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia = detectar_padrao(topos, fundos)
+    tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia, preco_extremo = detectar_padrao(topos, fundos, closes)
 
-    # Se o padrao é recente (entrada proxima do ultimo fechamento), usa o ultimo fechamento
-    # Senão mantém o preco do padrao para nao distorcer o calculo
+    # Entrada eh sempre o preco atual (ultimo fechamento) quando o padrao ja usa isso;
+    # para padroes historicos confirmados, se a entrada retornada bate no fechamento atual
+    # dentro de 15%, tambem usamos o fechamento atual.
     if preco_entrada > 0 and abs(close - preco_entrada) / preco_entrada < 0.15:
         preco_entrada = close
+        preco_extremo = preco_extremo if preco_extremo else preco_entrada
 
     # Calcular rr com base no padrao
     if direcao == "VENDA" and preco_entrada > 0 and preco_referencia > 0:
@@ -163,17 +188,22 @@ def calcular_features(candles):
         "direcao":        direcao,
         "preco_entrada":  round(preco_entrada, 2),
         "preco_referencia": round(preco_referencia, 2),
+        "preco_extremo": round(preco_extremo, 2) if preco_extremo else round(preco_entrada, 2),
     }
 
-def calcular_operacao(direcao, entrada, referencia):
+def calcular_operacao(direcao, entrada, referencia, extremo=None):
+    if extremo is None:
+        extremo = entrada
     if direcao == "VENDA":
-        stop  = round(entrada * 1.02, 2)
+        base_stop = max(extremo, entrada)
+        stop  = round(base_stop * 1.02, 2)
         alvo1 = round(referencia, 2)
         alvo2 = round(alvo1 - (stop - entrada), 2)
         risco   = stop - entrada
         retorno = entrada - alvo1
     elif direcao == "COMPRA":
-        stop  = round(entrada * 0.98, 2)
+        base_stop = min(extremo, entrada)
+        stop  = round(base_stop * 0.98, 2)
         alvo1 = round(referencia, 2)
         alvo2 = round(alvo1 + (entrada - stop), 2)
         risco   = entrada - stop
@@ -208,7 +238,7 @@ def predict():
     confianca = round(prob * 100, 1)
 
     stop, alvo1, alvo2, rr = calcular_operacao(
-        feat["direcao"], feat["preco_entrada"], feat["preco_referencia"]
+        feat["direcao"], feat["preco_entrada"], feat["preco_referencia"], feat.get("preco_extremo")
     )
 
     entrada = feat["preco_entrada"]
