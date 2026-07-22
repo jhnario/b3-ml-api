@@ -139,16 +139,16 @@ def calcular_features(candles, tolerancia=0.08):
         preco_entrada = close
         preco_extremo = preco_extremo if preco_extremo else preco_entrada
 
-    # Filtro de tendencia: so aceita o sinal se estiver alinhado com a tendencia de longo prazo
+    # Filtro de tendencia: bloqueia SOMENTE as combinacoes comprovadamente ruins
     tendencia = calcular_tendencia_longa(closes)
     motivo_debug = "OK"
     if tipo_num == -1:
         motivo_debug = "SEM_PADRAO_DETECTADO"
-    elif direcao == "COMPRA" and tendencia != "ALTA":
-        motivo_debug = f"BLOQUEADO_TENDENCIA(era_COMPRA_tend={tendencia})"
+    elif direcao == "COMPRA" and tendencia == "BAIXA":
+        motivo_debug = "BLOQUEADO_TENDENCIA(COMPRA_contra_BAIXA)"
         tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia, preco_extremo = -1, "SEM PADRAO", "INDEFINIDO", 0, 0, 0
-    elif direcao == "VENDA" and tendencia != "BAIXA":
-        motivo_debug = f"BLOQUEADO_TENDENCIA(era_VENDA_tend={tendencia})"
+    elif direcao == "VENDA" and tendencia == "ALTA":
+        motivo_debug = "BLOQUEADO_TENDENCIA(VENDA_contra_ALTA)"
         tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia, preco_extremo = -1, "SEM PADRAO", "INDEFINIDO", 0, 0, 0
 
     # Calcular rr com base no padrao
