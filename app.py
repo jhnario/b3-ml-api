@@ -124,7 +124,10 @@ def calcular_features(candles):
     dist_fib618 = abs(close - (topo_fib - diff * 0.618)) / close * 100
 
     topos, fundos = detectar_topos_fundos(closes)
-    tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia = detectar_padrao(topos, fundos)
+    tipo_num, tipo_nome, direcao, _, preco_referencia = detectar_padrao(topos, fundos)
+
+    # Entrada sempre é o ultimo fechamento (preco atual)
+    preco_entrada = close
 
     # Calcular rr com base no padrao
     if direcao == "VENDA" and preco_entrada > 0 and preco_referencia > 0:
