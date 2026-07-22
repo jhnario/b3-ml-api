@@ -211,10 +211,34 @@ def predict():
         feat["direcao"], feat["preco_entrada"], feat["preco_referencia"]
     )
 
+    entrada = feat["preco_entrada"]
+    direcao = feat["direcao"]
+
+    # Validacao: alvos devem estar do lado correto da entrada
+    if direcao == "VENDA" and (alvo1 is None or alvo1 >= entrada or alvo2 >= alvo1):
+        return jsonify({
+            "direcao": "INDEFINIDO",
+            "tipo_padrao": "SEM PADRAO",
+            "mensagem": "Padrao detectado mas alvos inconsistentes com preco atual",
+            "confianca": 0,
+            "entrada": None, "stop": None,
+            "alvo1": None, "alvo2": None, "rr": None
+        })
+
+    if direcao == "COMPRA" and (alvo1 is None or alvo1 <= entrada or alvo2 <= alvo1):
+        return jsonify({
+            "direcao": "INDEFINIDO",
+            "tipo_padrao": "SEM PADRAO",
+            "mensagem": "Padrao detectado mas alvos inconsistentes com preco atual",
+            "confianca": 0,
+            "entrada": None, "stop": None,
+            "alvo1": None, "alvo2": None, "rr": None
+        })
+
     return jsonify({
-        "direcao":     feat["direcao"],
+        "direcao":     direcao,
         "tipo_padrao": feat["tipo_nome"],
-        "entrada":     feat["preco_entrada"],
+        "entrada":     entrada,
         "stop":        stop,
         "alvo1":       alvo1,
         "alvo2":       alvo2,
