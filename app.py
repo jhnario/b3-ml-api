@@ -22,12 +22,9 @@ def detectar_topos_fundos(closes, janela=10):
             fundos.append({"idx": i, "preco": closes[i]})
     return topos, fundos
 
-def detectar_padrao(topos, fundos, closes, janela_recente=15, tolerancia=0.08, tolerancia_retest=0.08):
-    candidatos = []  # cada item: (idx_referencia, tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia, preco_extremo_stop)
-    ultimo_preco = closes[-1]
-    ultimo_idx = len(closes) - 1
+def detectar_padrao(topos, fundos, closes, tolerancia=0.08):
+    candidatos = []
 
-    # --- Padroes ja totalmente confirmados no historico ---
     for i in range(len(topos)-1):
         t1, t2 = topos[i], topos[i+1]
         if abs(t1["preco"] - t2["preco"]) / t1["preco"] <= tolerancia:
@@ -77,33 +74,6 @@ def detectar_padrao(topos, fundos, closes, janela_recente=15, tolerancia=0.08, t
                 if t1 and t2:
                     pescoco = (t1[0]["preco"] + t2[0]["preco"]) / 2
                     candidatos.append((od["idx"], 5, "OCO INVERTIDO", "COMPRA", od["preco"], pescoco, cab["preco"]))
-
-    # --- Padrao se formando: um topo/fundo recente (nao confirmado por candles futuros)
-    #     bate na mesma zona do ultimo topo/fundo ja confirmado. Isso cobre o caso de
-    #     "bateu no topo anteontem, caiu forte ontem e hoje" -- o 3o extremo eh o pico
-    #     recente, a entrada eh o preco de HOJE (ja em queda), e o stop se baseia
-    #     no preco do extremo recente, nao no preco de entrada.
-    inicio_janela = max(0, len(closes) - janela_recente)
-
-    if topos:
-        sub = closes[inicio_janela:]
-        idx_max_local = inicio_janela + sub.index(max(sub))
-        preco_max_recente = closes[idx_max_local]
-        t_ultimo = topos[-1]
-        if idx_max_local > t_ultimo["idx"] and abs(preco_max_recente - t_ultimo["preco"]) / t_ultimo["preco"] <= tolerancia_retest:
-            f_entre = [f for f in fundos if t_ultimo["idx"] < f["idx"] < idx_max_local]
-            fundo_ref = f_entre[0]["preco"] if f_entre else min(closes[t_ultimo["idx"]:idx_max_local+1])
-            candidatos.append((idx_max_local, 0, "TOPO DUPLO (formando)", "VENDA", ultimo_preco, fundo_ref, preco_max_recente))
-
-    if fundos:
-        sub = closes[inicio_janela:]
-        idx_min_local = inicio_janela + sub.index(min(sub))
-        preco_min_recente = closes[idx_min_local]
-        f_ultimo = fundos[-1]
-        if idx_min_local > f_ultimo["idx"] and abs(preco_min_recente - f_ultimo["preco"]) / f_ultimo["preco"] <= tolerancia_retest:
-            t_entre = [t for t in topos if f_ultimo["idx"] < t["idx"] < idx_min_local]
-            topo_ref = t_entre[0]["preco"] if t_entre else max(closes[f_ultimo["idx"]:idx_min_local+1])
-            candidatos.append((idx_min_local, 3, "FUNDO DUPLO (formando)", "COMPRA", ultimo_preco, topo_ref, preco_min_recente))
 
     if not candidatos:
         return -1, "SEM PADRAO", "INDEFINIDO", 0, 0, 0
