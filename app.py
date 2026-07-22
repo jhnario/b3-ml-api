@@ -140,11 +140,15 @@ def calcular_features(candles, tolerancia=0.08):
         preco_extremo = preco_extremo if preco_extremo else preco_entrada
 
     # Filtro de tendencia: so aceita o sinal se estiver alinhado com a tendencia de longo prazo
-    # COMPRA precisa de tendencia ALTA, VENDA precisa de tendencia BAIXA (validado: 88% acerto vs 65% sem filtro)
     tendencia = calcular_tendencia_longa(closes)
-    if direcao == "COMPRA" and tendencia != "ALTA":
+    motivo_debug = "OK"
+    if tipo_num == -1:
+        motivo_debug = "SEM_PADRAO_DETECTADO"
+    elif direcao == "COMPRA" and tendencia != "ALTA":
+        motivo_debug = f"BLOQUEADO_TENDENCIA(era_COMPRA_tend={tendencia})"
         tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia, preco_extremo = -1, "SEM PADRAO", "INDEFINIDO", 0, 0, 0
     elif direcao == "VENDA" and tendencia != "BAIXA":
+        motivo_debug = f"BLOQUEADO_TENDENCIA(era_VENDA_tend={tendencia})"
         tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia, preco_extremo = -1, "SEM PADRAO", "INDEFINIDO", 0, 0, 0
 
     # Calcular rr com base no padrao
@@ -180,6 +184,7 @@ def calcular_features(candles, tolerancia=0.08):
         "preco_entrada":  round(preco_entrada, 2),
         "preco_referencia": round(preco_referencia, 2),
         "preco_extremo": round(preco_extremo, 2) if preco_extremo else round(preco_entrada, 2),
+        "motivo_debug": motivo_debug,
     }
 
 def calcular_operacao(direcao, entrada, referencia, extremo=None):
@@ -222,7 +227,8 @@ def predict():
             "mensagem": "Nenhum padrao identificado no periodo visivel",
             "confianca": 0,
             "entrada": None, "stop": None,
-            "alvo1": None, "alvo2": None, "rr": None
+            "alvo1": None, "alvo2": None, "rr": None,
+            "motivo_debug": feat.get("motivo_debug", "?")
         })
 
     X = np.array([feat[c] for c in colunas]).reshape(1, -1)
@@ -265,7 +271,8 @@ def predict():
         "alvo1":       alvo1,
         "alvo2":       alvo2,
         "rr":          rr,
-        "confianca":   confianca
+        "confianca":   confianca,
+        "motivo_debug": feat.get("motivo_debug", "?")
     })
 
 @app.route("/", methods=["GET"])
