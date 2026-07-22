@@ -23,14 +23,12 @@ def detectar_topos_fundos(closes, janela=10):
     return topos, fundos
 
 def detectar_padrao(topos, fundos, tolerancia=0.08):
-    # Topo duplo
     for i in range(len(topos)-1):
         t1, t2 = topos[i], topos[i+1]
         if abs(t1["preco"] - t2["preco"]) / t1["preco"] <= tolerancia:
             f_entre = [f for f in fundos if t1["idx"] < f["idx"] < t2["idx"]]
             if f_entre:
                 return 0, "TOPO DUPLO", "VENDA", t2["preco"], f_entre[0]["preco"]
-    # Topo triplo
     for i in range(len(topos)-2):
         t1, t2, t3 = topos[i], topos[i+1], topos[i+2]
         if abs(t1["preco"]-t2["preco"])/t1["preco"] <= tolerancia and abs(t2["preco"]-t3["preco"])/t2["preco"] <= tolerancia:
@@ -38,7 +36,6 @@ def detectar_padrao(topos, fundos, tolerancia=0.08):
             f2 = [f for f in fundos if t2["idx"] < f["idx"] < t3["idx"]]
             if f1 and f2:
                 return 1, "TOPO TRIPLO", "VENDA", t3["preco"], min(f1[0]["preco"], f2[0]["preco"])
-    # OCO
     for i in range(len(topos)-2):
         oe, cab, od = topos[i], topos[i+1], topos[i+2]
         if cab["preco"] > oe["preco"] and cab["preco"] > od["preco"]:
@@ -48,14 +45,12 @@ def detectar_padrao(topos, fundos, tolerancia=0.08):
                 if f1 and f2:
                     pescoco = (f1[0]["preco"] + f2[0]["preco"]) / 2
                     return 2, "OCO", "VENDA", od["preco"], pescoco
-    # Fundo duplo
     for i in range(len(fundos)-1):
         f1, f2 = fundos[i], fundos[i+1]
         if abs(f1["preco"] - f2["preco"]) / f1["preco"] <= tolerancia:
             t_entre = [t for t in topos if f1["idx"] < t["idx"] < f2["idx"]]
             if t_entre:
                 return 3, "FUNDO DUPLO", "COMPRA", f2["preco"], t_entre[0]["preco"]
-    # Fundo triplo
     for i in range(len(fundos)-2):
         f1, f2, f3 = fundos[i], fundos[i+1], fundos[i+2]
         if abs(f1["preco"]-f2["preco"])/f1["preco"] <= tolerancia and abs(f2["preco"]-f3["preco"])/f2["preco"] <= tolerancia:
@@ -63,7 +58,6 @@ def detectar_padrao(topos, fundos, tolerancia=0.08):
             t2 = [t for t in topos if f2["idx"] < t["idx"] < f3["idx"]]
             if t1 and t2:
                 return 4, "FUNDO TRIPLO", "COMPRA", f3["preco"], max(t1[0]["preco"], t2[0]["preco"])
-    # OCO invertido
     for i in range(len(fundos)-2):
         oe, cab, od = fundos[i], fundos[i+1], fundos[i+2]
         if cab["preco"] < oe["preco"] and cab["preco"] < od["preco"]:
@@ -95,7 +89,7 @@ def calcular_features(candles):
     volume_vs_media = vols[-1] / vol_med if vol_med else 1
 
     amplitude = highs[-1] - lows[-1] if highs[-1] != lows[-1] else 0.0001
-    corpo     = abs(close - opens[-1])
+    corpo      = abs(close - opens[-1])
     sombra_sup = highs[-1] - max(close, opens[-1])
     sombra_inf = min(close, opens[-1]) - lows[-1]
     sombra_sup_pct = sombra_sup / amplitude * 100
@@ -112,7 +106,7 @@ def calcular_features(candles):
     topos, fundos = detectar_topos_fundos(closes)
     tipo_num, tipo_nome, direcao, preco_entrada, preco_referencia = detectar_padrao(topos, fundos)
 
-    # Calcular rr com base no padrão detectado
+    # Calcular rr com base no padrao
     if direcao == "VENDA" and preco_entrada > 0 and preco_referencia > 0:
         stop_temp = preco_entrada * 1.02
         risco = stop_temp - preco_entrada
@@ -127,21 +121,22 @@ def calcular_features(candles):
         rr = 0
 
     return {
-        "preco_vs_mm20": round(preco_vs_mm20, 2),
-        "preco_vs_mm50": round(preco_vs_mm50, 2),
+        "preco_vs_mm20":  round(preco_vs_mm20, 2),
+        "preco_vs_mm50":  round(preco_vs_mm50, 2),
         "preco_vs_mm200": round(preco_vs_mm200, 2),
-        "mm20_vs_mm50": round(mm20_vs_mm50, 2),
+        "mm20_vs_mm50":   round(mm20_vs_mm50, 2),
         "volume_vs_media": round(volume_vs_media, 2),
         "sombra_sup_pct": round(sombra_sup_pct, 2),
         "sombra_inf_pct": round(sombra_inf_pct, 2),
-        "corpo_pct": round(corpo_pct, 2),
-        "dist_fib382": round(dist_fib382, 2),
-        "dist_fib500": round(dist_fib500, 2),
-        "dist_fib618": round(dist_fib618, 2),
-        "tipo_num": tipo_num,
-        "tipo_nome": tipo_nome,
-        "direcao": direcao,
-        "preco_entrada": round(preco_entrada, 2),
+        "corpo_pct":      round(corpo_pct, 2),
+        "dist_fib382":    round(dist_fib382, 2),
+        "dist_fib500":    round(dist_fib500, 2),
+        "dist_fib618":    round(dist_fib618, 2),
+        "rr":             rr,
+        "tipo_num":       tipo_num,
+        "tipo_nome":      tipo_nome,
+        "direcao":        direcao,
+        "preco_entrada":  round(preco_entrada, 2),
         "preco_referencia": round(preco_referencia, 2),
     }
 
@@ -169,7 +164,7 @@ def predict():
     candles = dados.get("candles", [])
 
     if len(candles) < 30:
-        return jsonify({"erro": "Dados insuficientes — mínimo 30 candles"}), 400
+        return jsonify({"erro": "Dados insuficientes — minimo 30 candles"}), 400
 
     feat = calcular_features(candles)
 
@@ -177,14 +172,14 @@ def predict():
         return jsonify({
             "direcao": "INDEFINIDO",
             "tipo_padrao": "SEM PADRAO",
-            "mensagem": "Nenhum padrão identificado no período visível",
+            "mensagem": "Nenhum padrao identificado no periodo visivel",
             "confianca": 0,
             "entrada": None, "stop": None,
             "alvo1": None, "alvo2": None, "rr": None
         })
 
     X = np.array([feat[c] for c in colunas]).reshape(1, -1)
-    prob     = modelo.predict_proba(X)[0][1]
+    prob      = modelo.predict_proba(X)[0][1]
     confianca = round(prob * 100, 1)
 
     stop, alvo1, alvo2, rr = calcular_operacao(
