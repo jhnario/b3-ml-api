@@ -2,8 +2,10 @@
 import pickle
 import numpy as np
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 with open("b3_modelo.pkl", "rb") as f:
     salvo = pickle.load(f)
@@ -23,12 +25,6 @@ def predict():
         "acertou": previsao,
         "confianca": round(prob * 100, 1)
     })
-
-@app.route("/sinal", methods=["POST"])
-def sinal():
-    dados = request.get_json()
-    ticker = dados.get("ticker")
-    return jsonify({"status": "ok", "ticker": ticker})
 
 @app.route("/", methods=["GET"])
 def health():
