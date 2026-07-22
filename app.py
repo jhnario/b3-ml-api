@@ -144,13 +144,13 @@ def calcular_operacao(direcao, entrada, referencia):
     if direcao == "VENDA":
         stop  = round(entrada * 1.02, 2)
         alvo1 = round(referencia, 2)
-        alvo2 = round(entrada - (stop - entrada) * 2, 2)
+        alvo2 = round(alvo1 - (stop - entrada), 2)
         risco   = stop - entrada
         retorno = entrada - alvo1
     elif direcao == "COMPRA":
         stop  = round(entrada * 0.98, 2)
         alvo1 = round(referencia, 2)
-        alvo2 = round(entrada + (entrada - stop) * 2, 2)
+        alvo2 = round(alvo1 + (entrada - stop), 2)
         risco   = entrada - stop
         retorno = alvo1 - entrada
     else:
